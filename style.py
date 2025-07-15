@@ -2,6 +2,8 @@ import ttkbootstrap as tb
 import tkinter as tk
 from tkinter import ttk
 from collections import deque #최단 경로 찾기용
+from main import compute_route_info, checkupdown, ListLine1, ListLine2, ListLine3
+
 
 def show_coords(event):
     print(f"Mouse at ({event.x}, {event.y})")
@@ -10,6 +12,7 @@ StrStart_sty = None
 StrEnd_sty = None
 start_circle = None
 end_circle = None
+detail_expanded = False
 
 root = tb.Window(themename="flatly")
 root.geometry("1200x1080")
@@ -32,17 +35,25 @@ def on_station_click(event): #클릭 이벤트
     
     station_name = tags[1]
 
-    if StrStart_sty is None:
-        c.delete("highlight") #출발지 선택하면 이전 경로 사라짐
-        StrStart_sty = station_name
-        x,y = stations[station_name]
-
+  # 입력 방식으로 설정된 상태 초기화 (입력 방식 → 클릭 방식 전환용)
+    if StrStart_sty and StrEnd_sty:
+        StrStart_sty = None
+        StrEnd_sty = None
         if start_circle:
-            c.delete(start_circle) #출발지 선택하면 이전 출발지, 도착지 사라짐
+            c.delete(start_circle)
+            start_circle = None
+        if end_circle:
             c.delete(end_circle)
+            end_circle = None
+        c.delete("highlight")
 
-        start_circle = c.create_oval(x-6, y-6, x+6, y+6, fill="red", outline="black")
-        start_var.set(station_name) #콤보박스에도 역 이름 생성 
+      # 출발역 선택
+    if StrStart_sty is None:
+        StrStart_sty = station_name
+        x, y = stations[station_name]
+        c.delete("highlight")
+        start_circle = c.create_oval(x - 6, y - 6, x + 6, y + 6, fill="red", outline="black")
+        start_var.set(station_name)
         print(f"Start selected: {StrStart_sty}")
 
     elif StrEnd_sty is None:
@@ -50,61 +61,79 @@ def on_station_click(event): #클릭 이벤트
             print("출발지와 도착지가 같을 수 없습니다.")
             return
         StrEnd_sty = station_name
+        print(f"End selected: {StrEnd_sty}")  # 여기 추가
         x,y = stations[station_name]
 
-        if end_circle: #출발지에서 이미 지우기 때문에 없어도 되지만 안정적으로 한 번 더 추가
+        if end_circle:
             c.delete(end_circle) 
 
         end_circle = c.create_oval(x-6, y-6, x+6, y+6, fill="red", outline="black")
         end_var.set(station_name)
-        path = find_path(StrStart_sty, StrEnd_sty) 
+    
+        show_route_and_info(StrStart_sty,StrEnd_sty)
 
-        move_count = len(path) - 1
-        result_text = f"🚉 {StrStart_sty} → {StrEnd_sty}\n({move_count}개 역 이동)"
-        result_var.set(result_text)
-
-        start_btn.config(state="normal", bootstyle="info-outline")
-        end_btn.config(state="normal", bootstyle="info-outline")
-        print(f"End selected: {StrEnd_sty}")
-
-        draw_highlight_path(StrStart_sty, StrEnd_sty)
-
-        #상태 초기화
-        StrStart_sty = None 
+        # 상태 초기화
+        StrStart_sty = None
         StrEnd_sty = None
+        start_circle = None
+        end_circle = None
 
-def find_path(start,end):
-    visited = set() #이미 방문한 역들 저장.
-    queue = deque([[start]]) #지금까지의 경로들을 저장
+# def draw_highlight_path(start, end):
+#     c.delete("highlight")
 
-    while queue:
-        path = queue.popleft() #큐에서 하나의 경로 꺼내기
-        node = path[-1] #현재 마지막 위치한 역 가져오기
+#     try:
+#         path = compute_route_info(start, end)["route"]
+#     except:
+#         print("경로 없음")
+#         return
 
-        if node == end:
-            return path #도착역이면 지금까지 온 경로 반환
+#     # 하이라이트 라인 그리기
+#     for i in range(len(path) - 1):
+#         a, b = path[i], path[i + 1]
+#         x1, y1 = stations[a]
+#         x2, y2 = stations[b]
+#         c.create_line(x1, y1, x2, y2, fill="blue", width=6, tags="highlight")
+
+#     for station in path:
+#         x, y = stations[station]
+#         c.create_oval(x-6, y-6, x+6, y+6, fill="red", outline="black", tags="highlight")
+
+#def find_path(start,end):
+    #visited = set() #이미 방문한 역들 저장.
+    #queue = deque([[start]]) #지금까지의 경로들을 저장
+
+    #while queue:
+        #path = queue.popleft() #큐에서 하나의 경로 꺼내기
+        #node = path[-1] #현재 마지막 위치한 역 가져오기
+
+        #if node == end:
+            #return path #도착역이면 지금까지 온 경로 반환
         
-        if node not in visited:
-            visited.add(node)  #방문 안 했을시 현재역을 방문 목록에 추가
+        #if node not in visited:
+            #visited.add(node)  #방문 안 했을시 현재역을 방문 목록에 추가
 
-        for a,b in edges:
+        #for a,b in edges:
                 #b가 방문을 안 했다면 path+[b]로 현재 경로 뒤에 추가
-                if a==node and b not in visited:
-                    queue.append(path+[b])
-                elif b==node and a not in visited:
-                    queue.append(path+[a])
+                #if a==node and b not in visited:
+                    #queue.append(path+[b])
+                #elif b==node and a not in visited:
+                    #queue.append(path+[a])
 
 def show_station_list(mode):
     select_mode.set(mode)
     if mode == "start":
-        # 비활성화는 하지 않고 색만 바꿈
         start_btn.config(state="normal", bootstyle="secondary-outline")
         end_btn.config(state="normal", bootstyle="info-outline")
     else:
         end_btn.config(state="normal", bootstyle="secondary-outline")
         start_btn.config(state="normal", bootstyle="info-outline")
+
     station_listbox_frame.pack(pady=5)
-    result_label.pack_forget()
+
+    # 결과창 숨기기
+    result_text.pack_forget()
+    detail_btn.pack_forget()
+
 
 def on_station_select(event):
     try:
@@ -128,58 +157,168 @@ def on_station_select(event):
 
     station_listbox_frame.pack_forget()
     select_mode.set("none")
-    result_label.pack()
 
 
 #선택한 역에 빨간원, 금색 경로
-def draw_highlight_path(start,end):
+def draw_highlight_path(start, end):
     print(f"Highlight path from {start} to {end}")
+    c.delete("highlight")  # 기존 하이라이트 제거
 
-    # 기존 경로 제거
-    c.delete("highlight")
-
-
-    path = find_path(start, end)
-    if not path:
-        print("경로 없음")
+    try:
+        path = compute_route_info(start, end)["route"]
+    except Exception as e:
+        print("경로 없음:", e)
         return
 
     # 경로 선 그리기
-    for i in range(len(path)-1):
-        a, b = path[i], path[i+1]
+    for i in range(len(path) - 1):
+        a, b = path[i], path[i + 1]
+        if a not in stations or b not in stations:
+            continue
         x1, y1 = stations[a]
         x2, y2 = stations[b]
         c.create_line(x1, y1, x2, y2, fill="blue", width=6, tags="highlight")
 
-     #빨간원 표시
+    # 경로상 역에 빨간 원 그리기
     for station in path:
+        if station not in stations:
+            continue
         x, y = stations[station]
-        c.create_oval(x-6, y-6, x+6, y+6, fill="red", outline="black", tags="highlight")
+        c.create_oval(x - 6, y - 6, x + 6, y + 6, fill="red", outline="black", tags="highlight")
+
 
 
 #입력 방식으로 경로찾기
 def on_find_route():
+    global StrStart_sty, StrEnd_sty, start_circle, end_circle
     start = start_var.get()
     end = end_var.get()
 
-    if start not in stations or end not in stations or start == end:
-        result_var.set("올바른 출발지/도착지를 선택하세요.")
+    print(f"[DEBUG] on_find_route 호출: start={start}, end={end}")
+
+    if start not in stations:
+        print(f"[ERROR] 출발역 '{start}'가 좌표 목록에 없음")
+        result_var.set("출발역이 잘못되었습니다.")
         return
-    
-    path = find_path(start,end)
-    if not path:
-        result_var.set("경로를 찾을 수 없습니다.")
+    if end not in stations:
+        print(f"[ERROR] 도착역 '{end}'가 좌표 목록에 없음")
+        result_var.set("도착역이 잘못되었습니다.")
+        return
+    if start == end:
+        print("[ERROR] 출발역과 도착역이 같음")
+        result_var.set("출발역과 도착역이 같을 수 없습니다.")
+        return
+
+    # 상태 초기화
+    StrStart_sty = None
+    StrEnd_sty = None
+    if start_circle:
+        c.delete(start_circle)
+        start_circle = None
+    if end_circle:
+        c.delete(end_circle)
+        end_circle = None
+    c.delete("highlight")
+
+    # 경로 정보 및 지도 표시
+    try:
+        show_route_and_info(start, end)
+    except Exception as e:
+        print(f"[ERROR] show_route_and_info 호출 중 예외 발생: {e}")
+
+
+def format_time(t):
+    if isinstance(t, int):
+        h = t // 100
+        m = t % 100
+        return f"{h:02d}:{m:02d}"
+    return str(t)
+
+def show_route_and_info(start, end):
+    global StrStart_sty, StrEnd_sty, start_circle, end_circle, detail_expanded
+
+    if start_circle:
+        c.delete(start_circle)
+    if end_circle:
+        c.delete(end_circle)
+    c.delete("highlight")
+
+    StrStart_sty = start
+    StrEnd_sty = end
+    detail_expanded = False
+
+    try:
+        info = compute_route_info(start, end)
+
+        route_str = f"{start} → {end}"
+        distance_str = f"⏱ 소요 시간: {info['distance']}분"
+        time_str = f"🕒 출발: {info['depart_time'].strftime('%H:%M:%S')}    도착: {info['arrival_time'].strftime('%H:%M:%S')}"
+
+        first_tr = info['first_transfer']
+        transfer_info = "🔁 환승 역: 없음"
+        if first_tr != "없음":
+            direction = ""
+            for line in ListLine1 + ListLine2 + ListLine3:
+                dir_value = checkupdown(first_tr, end, line)
+                if dir_value != 0:
+                    direction = "하행" if dir_value < 0 else "상행"
+                    break
+            transfer_info = f"🔁 환승 역: {first_tr}역에서 {direction} 열차로 환승"
+
+        result_text.configure(state="normal")
+        result_text.delete("1.0", tk.END)
+
+        lines = [
+            f"🚉 {route_str}",
+            f" ",  # 빈 줄 (줄간 간격 역할)
+            f"{distance_str}",
+            f"{time_str}",
+            f"{transfer_info}"
+        ]
+
+        for i, line in enumerate(lines):
+            index = result_text.index(tk.INSERT)
+            result_text.insert(tk.END, line + "\n")
+
+            # 마지막 줄(transfer_info)에는 태그 안 붙임 (spacing 없음)
+            if i != len(lines) - 1:
+                result_text.tag_add("custom", index, f"{index} lineend")
+
+        result_text.configure(state="disabled")
+        result_text.pack(pady=10, padx=20)
+
+        detail_btn.pack()
+        detail_btn.config(text="경로 보기 ▼")
+
+        draw_highlight_path(start, end)
+
+    except Exception as e:
+        print(f"[ERROR] show_route_and_info 예외 발생: {e}")
+        result_text.configure(state="normal")
+        result_text.delete("1.0", tk.END)
+        result_text.insert(tk.END, "❌ 경로를 찾을 수 없습니다.\n", "custom")
+        result_text.configure(state="disabled")
+        result_text.pack(pady=10, padx=20)
         c.delete("highlight")
+
+def toggle_detail():
+    global detail_expanded
+    if not StrStart_sty or not StrEnd_sty:
         return
-    
-    draw_highlight_path(start,end)
 
-    move_count = len(path) - 1
-    result_text = f"🚉 {start} → {end}\n({move_count}개 역 이동)"
-    result_var.set(result_text)
+    info = compute_route_info(StrStart_sty, StrEnd_sty)
+    route = info["route"]
 
-    start_btn.config(state="normal", bootstyle="info-outline")
-    end_btn.config(state="normal", bootstyle="info-outline")
+    if not detail_expanded:
+        route_str = " → ".join(route)
+        result_text.configure(state="normal")
+        # spacing2가 적용된 detail 태그 사용
+        result_text.insert(tk.END, f"\n\n📍 전체 경로:\n{route_str}", "detail")
+        result_text.configure(state="disabled")
+        detail_btn.config(text="간단히 보기 ▲")
+        detail_expanded = True
+    else:
+        show_route_and_info(StrStart_sty, StrEnd_sty)
 
 # 역 좌표
 Dict_stations_1 = {
@@ -194,7 +333,7 @@ Dict_stations_1 = {
 
     "서부정류장": (255, 298),
     "대명": (297, 298),
-    "안자랑": (337, 298),
+    "안지랑": (337, 298),
     "현충로": (384, 298),
     "영대병원": (430, 298),
     "교대": (477, 298),
@@ -292,6 +431,7 @@ Dict_stations_3 = {
     "칠곡경대병원": (155, 690),
 }
 
+
 # 연결리스트
 edges_1 = [
     (a, b) for a, b in zip(list(Dict_stations_1), list(Dict_stations_1)[1:])
@@ -323,7 +463,7 @@ stations.update(Dict_stations_2_shifted)
 stations.update(Dict_stations_3)
 
 #좌표 이동
-shift_x = 80
+shift_x = 60
 shift_y = -15
 stations = {
     name: (x + shift_x, y + shift_y)
@@ -362,6 +502,7 @@ for name, (x,y) in stations.items():
 
 c.tag_bind("station","<Button-1>", on_station_click)
 
+
 #입력 박스
 frame = tb.Frame(root)
 frame.pack(pady=35)
@@ -380,15 +521,34 @@ end_btn.grid(row=0, column=1, padx=10)
 
 tb.Button(frame, text="경로 찾기", command=on_find_route, bootstyle="primary").grid(row=0, column=2, padx=10)
 
-result_label = tb.Label(
+# 기존 result_label 제거
+
+# 기존 pack 제거
+# result_text.pack(pady=10, fill="x", padx=20)
+# detail_btn.pack()
+
+# 대신 .pack_forget() 상태로 시작
+
+result_text = tk.Text(
     root,
-    textvariable=result_var, 
-    font=("Arial", 14), 
-    bootstyle="info",
-    anchor="center",
-    justify="center"
-    )
-result_label.pack(pady=10)
+    height=8, 
+    width=40, 
+    font=("Arial", 12), 
+    wrap="char", 
+    background="#f0f8ff", 
+    borderwidth=0, 
+    highlightthickness=0,
+    relief="flat",   
+    takefocus=0
+)
+
+result_text.tag_configure("custom", justify="left", spacing3=7)#, "center"  # 중앙 정렬 태그 정의
+result_text.tag_configure("detail", justify="left", spacing2=5)
+result_text.configure(state="disabled")
+result_text.pack_forget()  # 처음에는 숨김
+
+detail_btn = tb.Button(root, text="상세 보기 ▼", bootstyle="secondary-outline", command=lambda: toggle_detail())
+detail_btn.pack_forget()  # 처음에는 숨김
 
 station_listbox_frame = ttk.Frame(root)
 station_listbox_frame.pack_forget()
@@ -416,7 +576,6 @@ def create_station_tabs(parent):
     return notebook
 
 notebook = create_station_tabs(station_listbox_frame)
-
+#print(list(Dict_stations_1))
 
 root.mainloop()
-
